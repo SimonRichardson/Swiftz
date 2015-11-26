@@ -12,17 +12,23 @@ import SwiftCheck
 
 class ReaderSpec : XCTestCase {
     func testReader() {
+        func addOne() -> Reader<Int, Int> {
+            return Reader { $0 + 1 }
+        }
+        
         func hello() -> Reader<String, String> {
-            return Reader.init { "Hello \($0)" }
+            return Reader { "Hello \($0)" }
         }
         
         func bye() -> Reader<String, String> {
-            return Reader.init { "Goodbye \($0)!" }
+            return Reader { "Goodbye \($0)!" }
         }
 
         func helloAndGoodbye() -> Reader<String, String> {
-            return Reader.init { hello().runReader($0) + " and " + bye().runReader($0) }
+            return Reader { hello().runReader($0) + " and " + bye().runReader($0) }
         }
+        
+        XCTAssert(addOne().runReader(1) == 2)
         
         let input = "Matthew"
         let helloReader = hello()
@@ -43,5 +49,34 @@ class ReaderSpec : XCTestCase {
         
         let helloAndGoodbyeReader = helloAndGoodbye()
         XCTAssert(helloAndGoodbyeReader.runReader(input) == "Hello \(input) and Goodbye \(input)!")
+        
+        let lengthResult = runReader { (environment: String) -> Int in
+            return environment.lengthOfBytesUsingEncoding(NSUTF8StringEncoding)
+        }("Banana")
+        XCTAssert(lengthResult == 6)
+        
+        let length: String -> Int = { $0.lengthOfBytesUsingEncoding(NSUTF8StringEncoding) }
+        
+        let lengthResult2 = runReader(length)("Banana")
+        XCTAssert(lengthResult2 == 6)
+    
+        // Ask        
+        let lengthResult3 = runReader(ask())(1234)
+        XCTAssert(lengthResult3 == 1234)
+        
+        let lengthResult4 = runReader(ask)(1234)
+        XCTAssert(lengthResult4 == 1234)
+        
+        // Asks
+        let lengthResult5 = runReader(asks(length))("Banana")
+        XCTAssert(lengthResult5 == 6)
+        
+        let lengthReader = runReader(asks)(length)
+        let lengthResult6 = lengthReader.runReader("Banana")
+        XCTAssert(lengthResult6 == 6)
+        
+        // >>-
+        let lengthResult7 = (asks(length) >>- runReader)?("abc")
+        XCTAssert(lengthResult7 == .Some(3))
     }
 }

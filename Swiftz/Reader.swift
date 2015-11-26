@@ -6,54 +6,62 @@
 //  Copyright © 2015 TypeLift. All rights reserved.
 //
 
-import Foundation
-
-/// A type for a `Reader` monad
-public protocol ReaderType {
-    /// The environment
-    typealias Environment
-    
-    /// The modified environment
-    typealias ModifiedEnvironment
-    
-    /// The function that modifies the environment
-    var reader : Environment -> ModifiedEnvironment { get }
-    
-    /// Runs the reader and extracts the final value from it
-    func runReader(environment : Environment) -> ModifiedEnvironment
-    
-    /// Executes a computation in a modified environment
-    func local(f : Environment -> Environment) -> Self
-}
-
-/// A `Reader` monad.
+/// A `Reader` monad with `R` for environment and `A` to represent the modified environment.
 public struct Reader<R, A> {
-    private let f : R -> A
+    /// The function that modifies the environment
+    public let reader : R -> A
     
     init(_ reader : R -> A) {
-        f = reader
+        self.reader = reader
     }
     
+    /// Transform the value returned by a reader
     public func mapReader<B>(f : A -> B) -> Reader<R, B> {
         return Reader<R, B>(f • runReader)
     }
-}
-
-extension Reader: ReaderType {
-    public typealias Environment = R
-    public typealias ModifiedEnvironment = A
     
-    public var reader : R -> A {
-        return f
-    }
-    
+    /// Runs the reader and extracts the final value from it
     public func runReader(environment : R) -> A {
         return reader(environment)
     }
     
+    /// Executes a computation in a modified environment
     public func local(f : R -> R) -> Reader<R, A> {
         return Reader(reader • f)
     }
+
+    /// Retrieves the monad environment
+    public func ask() -> R -> A {
+        return reader
+    }
+}
+
+/// Puts a value in a reader.
+public func returnReader<R, A>(a : A) -> Reader<R, A> {
+    return Reader<R, A>.pure(a)
+}
+
+/// Runs the reader and extracts the final value from it. This provides a global function for running a reader.
+public func runReader<R, A>(reader : R -> A) -> R -> A {
+    return runReader(Reader<R, A>(reader))
+}
+
+public func runReader<R, A>(reader : () -> R -> A) -> R -> A {
+    return runReader(reader())
+}
+
+public func runReader<R, A>(reader : Reader<R, A>) -> R -> A {
+    return reader.runReader
+}
+
+/// Retrieves the monad environment
+public func ask<A>() -> A -> A {
+    return identity
+}
+
+/// Retrieves a function of the current environment
+public func asks<R, A>(f : R -> A) -> Reader<R, A> {
+    return Reader(f)
 }
 
 extension Reader : Functor {
@@ -70,8 +78,8 @@ public func <^> <R, A, B>(f : A -> B, r : Reader<R, A>) -> Reader<R, B> {
 }
 
 extension Reader : Pointed {
-    public static func pure(f : A) -> Reader<R, A> {
-        return Reader { _ in f }
+    public static func pure(a : A) -> Reader<R, A> {
+        return Reader<R, A> { _ in a }
     }
 }
 
@@ -84,12 +92,12 @@ extension Reader : Applicative {
 }
 
 public func <*> <R, A, B>(rfs : Reader<R, A -> B>, xs : Reader<R, A>) -> Reader<R, B>  {
-    return Reader<R, B>.init({ (environment: R) -> B in
+    return Reader<R, B> { (environment : R) -> B in
         let a = xs.runReader(environment)
         let ab = rfs.runReader(environment)
         let b = ab(a)
         return b
-    })
+    }
 }
 
 extension Reader : ApplicativeOps {
@@ -118,12 +126,29 @@ extension Reader : Monad {
 }
 
 func >>- <R, A, B>(r : Reader<R, A>, f : A -> Reader<R, B>) -> Reader<R, B> {
-    return Reader<R, B>.init({ (environment: R) -> B in
+    return Reader<R, B> { (environment : R) -> B in
         let a = r.runReader(environment)
         let readerB = f(a)
         let b = readerB.runReader(environment)
         return b
-    })
+    }
+}
+
+func >>- <R, A>(r : Reader<R, A>, f : A -> Reader<R, A>) -> Reader<R, A> {
+    return Reader<R, A> { (environment : R) -> A in
+        let a = r.runReader(environment)
+        let readerA = f(a)
+        let newA = readerA.runReader(environment)
+        return newA
+    }
+}
+
+func >>- <R, A, B>(r : Reader<R, A>, f : A -> (R -> B)) -> Reader<R, B> {
+    let f2 = { (a : A) -> R -> B in
+        return f(a)
+    }
+    
+    return r >>- f2
 }
 
 extension Reader : MonadOps {
