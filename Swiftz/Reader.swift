@@ -71,7 +71,7 @@ public func <^> <R, A, B>(f : A -> B, r : Reader<R, A>) -> Reader<R, B> {
 
 extension Reader : Pointed {
     public static func pure(f : A) -> Reader<R, A> {
-        return Reader<R, A>.init { _ in f }
+        return Reader { _ in f }
     }
 }
 
@@ -98,21 +98,21 @@ extension Reader : ApplicativeOps {
     public typealias D = Any
     public typealias FD = Reader<R, D>
     
-    public static func liftA(f: A -> B) -> Reader<R, A> -> Reader<R, B> {
+    public static func liftA(f : A -> B) -> Reader<R, A> -> Reader<R, B> {
         return { a in Reader<R, A -> B>.pure(f) <*> a }
     }
     
-    public static func liftA2(f: A -> B -> C) -> Reader<R, A> -> Reader<R, B> -> Reader<R, C> {
+    public static func liftA2(f : A -> B -> C) -> Reader<R, A> -> Reader<R, B> -> Reader<R, C> {
         return { a in { b in f <^> a <*> b  } }
     }
     
-    public static func liftA3(f: A -> B -> C -> D) -> Reader<R, A> -> Reader<R, B> -> Reader<R, C> -> Reader<R, D> {
+    public static func liftA3(f : A -> B -> C -> D) -> Reader<R, A> -> Reader<R, B> -> Reader<R, C> -> Reader<R, D> {
         return { a in { b in { c in f <^> a <*> b <*> c } } }
     }
 }
 
 extension Reader : Monad {
-    public func bind(f: A -> Reader<R, B>) -> Reader<R, B> {
+    public func bind(f : A -> Reader<R, B>) -> Reader<R, B> {
         return self >>- f
     }
 }
@@ -127,15 +127,15 @@ func >>- <R, A, B>(r : Reader<R, A>, f : A -> Reader<R, B>) -> Reader<R, B> {
 }
 
 extension Reader : MonadOps {
-    public static func liftM(f: A -> B) -> Reader<R, A> -> Reader<R, B> {
+    public static func liftM(f : A -> B) -> Reader<R, A> -> Reader<R, B> {
         return { m1 in m1 >>- { x1 in Reader<R, B>.pure(f(x1)) } }
     }
     
-    public static func liftM2(f: A -> B -> C) -> Reader<R, A> -> Reader<R, B> -> Reader<R, C> {
+    public static func liftM2(f : A -> B -> C) -> Reader<R, A> -> Reader<R, B> -> Reader<R, C> {
         return { m1 in { m2 in m1 >>- { x1 in m2 >>- { x2 in Reader<R, C>.pure(f(x1)(x2)) } } } }
     }
     
-    public static func liftM3(f: A -> B -> C -> D) -> Reader<R, A> -> Reader<R, B> -> Reader<R, C> -> Reader<R, D> {
+    public static func liftM3(f : A -> B -> C -> D) -> Reader<R, A> -> Reader<R, B> -> Reader<R, C> -> Reader<R, D> {
         return { m1 in { m2 in { m3 in m1 >>- { x1 in m2 >>- { x2 in m3 >>- { x3 in Reader<R, D>.pure(f(x1)(x2)(x3)) } } } } } }
     }
 }
